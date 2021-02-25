@@ -1,17 +1,29 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
+import Light from "./light";
+import Triangle from "./triangle";
+
+import { TweenMax as TM, Power3 } from "gsap/all";
+
 export default class Sketch {
   constructor(options) {
-    this.clock = new THREE.Clock();
+    this.container = options.dom;
 
-    this.listColors = options.listColors;
-    this.listDateColors = options.listDateColors;
+    // this.listColors = options.listColors;
+    // this.listDateColors = options.listDateColors;
 
     this.dateEl = options.dateEl;
     this.timeEls = options.timeEls;
 
-    this.container = options.dom;
+    this.options = options;
+
+    this.init();
+  }
+
+  init() {
+    this.clock = new THREE.Clock();
+
     this.scene = new THREE.Scene();
 
     this.width = this.container.offsetWidth;
@@ -31,11 +43,18 @@ export default class Sketch {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
 
+    // Utils
+    this.hoverEased = { value: 1 };
+
+    // Lights
+    this.light = new Light(this.scene);
+
+    // Objects
+    this.triangle = new Triangle(this.options, this.scene);
+
     this.resize();
     this.setupResize();
-    this.addLight();
-    this.addTriangle();
-    this.updateColorTriangle();
+    this.computeHoverEased();
     this.render();
   }
 
@@ -51,55 +70,27 @@ export default class Sketch {
     this.camera.updateProjectionMatrix();
   }
 
-  addLight() {
-    this.pointLight = new THREE.PointLight("#fff", 2, 15);
-    this.scene.add(this.pointLight);
-
-    this.pointLightHelper = new THREE.PointLightHelper(this.pointLight, 0.1);
-    this.scene.add(this.pointLightHelper);
-  }
-
-  animateLight(time) {
-    this.pointLight.position.set(Math.sin(time * 0.05), 2, Math.abs(Math.cos(time * 0.15)));
-  }
-
-  addTriangle() {
-    this.geometry = new THREE.ConeGeometry(1, 1.788, 3);
-    this.material = new THREE.MeshStandardMaterial();
-
-    this.mesh = new THREE.Mesh(this.geometry, this.material);
-    this.mesh.rotation.y = 1;
-    this.mesh.position.x = -0.5;
-    this.scene.add(this.mesh);
-  }
-
-  updateColorTriangle() {
+  computeHoverEased() {
     this.timeEls.forEach((timeEl) => {
       timeEl.addEventListener("mouseenter", () => {
-        const indexColor = [...this.timeEls].indexOf(timeEl);
+        this.indexOpacity = ([...this.timeEls].indexOf(timeEl) + 1) / this.timeEls.length;
 
-        // Change color triangle
-        this.material.color = new THREE.Color(this.listColors[indexColor]);
-
-        // Change color date
-        this.dateEl.style.color = this.listDateColors[indexColor];
+        TM.to(this.hoverEased, 0.7, {
+          value: this.indexOpacity,
+          ease: Power3,
+        });
       });
     });
-  }
-
-  animateTriangle(time) {
-    this.mesh.rotation.y = time * 0.002;
-    this.mesh.rotation.x = time * 0.004;
   }
 
   render() {
     this.elapsedTime = this.clock.getElapsedTime();
 
     // Animate light
-    this.animateLight(this.elapsedTime);
+    this.light.animate(this.elapsedTime);
 
     // Animate triangle
-    this.animateTriangle(this.elapsedTime);
+    this.triangle.animate(this.elapsedTime, this.hoverEased.value);
 
     // Update controls
     this.controls.update();
